@@ -16,13 +16,14 @@
 package com.android.axion.axthemestore.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import com.android.axion.compose.preferences.ExpressiveShapes
 import com.android.axion.compose.theme.AxionTheme
 
 @Composable
-fun AxThemeStoreTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit
-) {
-    AxionTheme(darkTheme = darkTheme, content = content)
+fun AxThemeStoreTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    AxionTheme(darkTheme = darkTheme) {
+        MaterialTheme(shapes = ExpressiveShapes, content = content)
+    }
 }

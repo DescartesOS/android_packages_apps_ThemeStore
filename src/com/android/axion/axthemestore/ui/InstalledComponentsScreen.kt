@@ -14,134 +14,163 @@
  * limitations under the License.
 */
 
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.android.axion.axthemestore.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.*
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.axion.axthemestore.R
-import com.android.axion.axthemestore.engine.ThemeEngineProxy
+import com.android.axion.axthemestore.ui.components.*
 import com.android.axion.axthemestore.viewmodel.ThemeStoreViewModel
+import com.android.axion.compose.scaffold.AxionScaffold
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InstalledComponentsScreen(
-    viewModel: ThemeStoreViewModel,
-    onBackClick: () -> Unit
-) {
+fun InstalledComponentsScreen(viewModel: ThemeStoreViewModel, onBackClick: () -> Unit) {
     val categoryThemes by viewModel.categoryThemesState.collectAsStateWithLifecycle()
-    val iconTheme = remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(Unit) {
-        val proxy = ThemeEngineProxy(viewModel.getApplication())
-        iconTheme.value = proxy.getIconTheme()
-    }
-    
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { 
-                    Text(
-                        text = stringResource(R.string.installed_components),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { paddingValues ->
+    val components = remember(categoryThemes) { categoryThemes.entries.sortedBy { it.key } }
+    AxionScaffold(
+        title = stringResource(R.string.your_setup),
+        onBackClick = onBackClick,
+        collapsedByDefault = false,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) { padding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding),
+            contentPadding = PaddingValues(20.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            item {
-                Column(
-                    modifier = Modifier.padding(bottom = 8.dp)
+            item(key = "summary") {
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.primaryContainer,
                 ) {
-                    Text(
-                        text = stringResource(R.string.active_theme_components),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = stringResource(R.string.active_theme_components_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(
+                        Modifier.fillMaxWidth().padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        StoreEmblem(
+                            Icons.Default.AutoAwesome,
+                            Modifier.size(64.dp),
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.onPrimary,
+                        )
+                        Text(
+                            stringResource(R.string.setup_title),
+                            style = MaterialTheme.typography.headlineLargeEmphasized,
+                        )
+                        Text(
+                            stringResource(R.string.setup_description),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        ) {
+                            Text(
+                                pluralStringResource(
+                                    R.plurals.active_component_count,
+                                    components.size,
+                                    components.size,
+                                ),
+                                style = MaterialTheme.typography.labelLarge,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
                 }
             }
-            
-            if (categoryThemes.isNotEmpty()) {
-                item {
-                    SectionHeader(title = stringResource(R.string.icon_theme_components))
-                }
-                
-                items(categoryThemes.entries.toList()) { (category, packageName) ->
-                    ComponentCard(
-                        componentName = getCategoryDisplayName(category),
-                        packageOrId = packageName,
-                        icon = getCategoryIcon(category),
-                        isBuiltIn = false
-                    )
-                }
-            } else {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
+            item(key = "heading") {
+                StoreSectionHeading(
+                    stringResource(R.string.active_theme_components),
+                    Modifier.padding(start = 4.dp, top = 24.dp, bottom = 12.dp),
+                )
+            }
+            if (components.isEmpty()) {
+                item(key = "empty") {
+                    Surface(
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
                     ) {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            Modifier.fillMaxWidth().padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            StoreEmblem(Icons.Default.Palette, Modifier.size(80.dp))
                             Text(
-                                text = stringResource(R.string.no_icon_themes_installed),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
+                                stringResource(R.string.no_icon_themes_installed),
+                                style = MaterialTheme.typography.titleLargeEmphasized,
+                                textAlign = TextAlign.Center,
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = stringResource(R.string.browse_for_icon_themes),
+                                stringResource(R.string.browse_for_icon_themes),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                            FilledTonalButton(
+                                onClick = onBackClick,
+                                modifier = Modifier.heightIn(min = 56.dp),
+                            ) {
+                                Text(stringResource(R.string.explore_themes))
+                            }
+                        }
+                    }
+                }
+            } else {
+                itemsIndexed(components, key = { _, entry -> entry.key }) { index, entry ->
+                    Surface(
+                        shape = storeGroupedShape(index, components.size),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            val (container, foreground) = storeCategoryColors(entry.key)
+                            StoreEmblem(
+                                storeCategoryIcon(entry.key),
+                                Modifier.size(48.dp),
+                                container,
+                                foreground,
+                            )
+                            Column(
+                                Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    getCategoryDisplayName(entry.key),
+                                    style = MaterialTheme.typography.titleMediumEmphasized,
+                                )
+                                Text(
+                                    entry.value.substringAfterLast('.'),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                stringResource(R.string.active),
+                                tint = MaterialTheme.colorScheme.primary,
                             )
                         }
                     }
@@ -151,111 +180,16 @@ fun InstalledComponentsScreen(
     }
 }
 
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-    )
-}
-
-@Composable
-private fun ComponentCard(
-    componentName: String,
-    packageOrId: String,
-    icon: ImageVector,
-    isBuiltIn: Boolean
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        shape = MaterialTheme.shapes.small
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(48.dp),
-                shape = MaterialTheme.shapes.extraSmall,
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = componentName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = if (isBuiltIn) packageOrId else packageOrId.substringAfterLast('.'),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            if (!isBuiltIn) {
-                Surface(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        text = stringResource(R.string.active),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun getCategoryDisplayName(categoryId: String): String {
-    return when (categoryId) {
+private fun getCategoryDisplayName(categoryId: String): String =
+    when (categoryId) {
         "android" -> "Android Framework"
         "systemui" -> "System UI"
-        "wifi" -> "WiFi Icons"
-        "signal" -> "Signal Icons"
-        "back_gesture" -> "Back Gesture"
-        "charging_animation" -> "Charging Animation"
-        "battery_style" -> "Battery Style"
+        "wifi",
+        "statusbar_wifi" -> "Wi-Fi icons"
+        "signal",
+        "statusbar_signal" -> "Signal icons"
+        "back_gesture" -> "Back gesture"
+        "charging_animation" -> "Charging animation"
+        "battery_style" -> "Battery style"
         else -> categoryId.replace('_', ' ').replaceFirstChar { it.uppercase() }
     }
-}
-
-private fun getCategoryIcon(categoryId: String): ImageVector {
-    return when (categoryId) {
-        "wifi" -> Icons.Default.Wifi
-        "signal" -> Icons.Default.SignalCellularAlt
-        "systemui" -> Icons.Default.SettingsApplications
-        "android" -> Icons.Default.Android
-        "back_gesture" -> Icons.Default.SwipeLeft
-        "charging_animation" -> Icons.Default.Bolt
-        "battery_style" -> Icons.Default.BatteryFull
-        else -> Icons.Default.Category
-    }
-}

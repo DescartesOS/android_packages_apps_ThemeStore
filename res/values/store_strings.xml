@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2024-2026 Lunaris AOSP
+     SPDX-License-Identifier: Apache-2.0 -->
+<resources>
+    <string name="make_it">Make it</string>
+    <string name="yours">yours.</string>
+    <string name="store_intro">Little details. A whole new feel.</string>
+    <string name="browse_categories">Explore by category</string>
+    <string name="your_setup">Your setup</string>
+    <string name="your_setup_description">All the details that make it you.</string>
+    <string name="your_collection">Your collection</string>
+    <string name="view_all">View all</string>
+    <string name="view_collection">View all %s</string>
+    <string name="featured_page">Featured theme %1$d of %2$d: %3$s</string>
+    <string name="collection_hint">Find a new favorite. Make it yours.</string>
+    <string name="find_your_style">Find your style</string>
+    <string name="search_description">Search for a theme, a creator, or a fresh look.</string>
+    <string name="remove_search">Remove %s from recent searches</string>
+    <string name="available">Explore</string>
+    <string name="built_in">Built in</string>
+    <string name="update_available">Update available</string>
+    <string name="download_progress">Downloading %d%%</string>
+    <string name="ready_to_install">Ready to install</string>
+    <string name="theme_by_author">by %s</string>
+    <string name="about_theme">About this theme</string>
+    <string name="theme_version">Version</string>
+    <string name="theme_size">Download size</string>
+    <string name="customize_components">Make it your own</string>
+    <string name="customize_components_description">Choose which parts of this theme to use.</string>
+    <string name="setup_title">Made for you.</string>
+    <string name="setup_description">Your active styles, all in one place.</string>
+    <string name="current_component_source">Currently using %s</string>
+    <string name="explore_themes">Explore themes</string>
+    <plurals name="theme_count">
+        <item quantity="one">%d theme</item>
+        <item quantity="other">%d themes</item>
+    </plurals>
+    <plurals name="search_result_count">
+        <item quantity="one">%d result</item>
+        <item quantity="other">%d results</item>
+    </plurals>
+    <plurals name="active_component_count">
+        <item quantity="one">%d active component</item>
+        <item quantity="other">%d active components</item>
+    </plurals>
+</resources>
