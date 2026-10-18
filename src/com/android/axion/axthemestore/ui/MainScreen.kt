@@ -34,12 +34,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.*
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel as composeViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.android.axion.axthemestore.ui.components.CustomizationToolbar
 import com.android.axion.axthemestore.viewmodel.FontViewModel
+import com.android.axion.axthemestore.viewmodel.NavbarViewModel
 import com.android.axion.axthemestore.viewmodel.ThemeStoreViewModel
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
@@ -128,12 +130,20 @@ fun MainScreen(
                     onNavigateToInstalledComponents = {
                         navController.navigate("installed_components")
                     },
+                    onNavigateToNavbarStyles = { navController.navigate("navbar_styles") },
                     bottomPadding = toolbarPadding,
                     onSearchActiveChange = { searchingThemes = it },
                 )
             }
             composable("fonts") {
                 FontCustomizationScreen(fontViewModel, bottomPadding = toolbarPadding)
+            }
+            composable("navbar_styles") {
+                val navbarViewModel: NavbarViewModel = composeViewModel()
+                NavbarCustomizationScreen(
+                    navbarViewModel,
+                    onBackClick = { navController.popBackStack() },
+                )
             }
             composable("installed_components") {
                 InstalledComponentsScreen(viewModel, onBackClick = { navController.popBackStack() })

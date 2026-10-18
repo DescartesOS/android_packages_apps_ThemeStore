@@ -31,6 +31,17 @@
     <string name="setup_description">Your active styles, all in one place.</string>
     <string name="current_component_source">Currently using %s</string>
     <string name="explore_themes">Explore themes</string>
+    <string name="navbar_styles_title">Navbar style</string>
+    <string name="navbar_styles_description">Choose a look for Back, Home and Recents. Tap a style to apply it.</string>
+    <string name="navbar_navigation_hint">Visible with 3-button navigation.</string>
+    <string name="navbar_default">Default</string>
+    <string name="navbar_choose_style">Choose your style</string>
+    <string name="navbar_tap_to_apply">Tap to apply</string>
+    <string name="navbar_applying">Applying…</string>
+    <string name="navbar_loading">Loading navbar styles…</string>
+    <string name="navbar_preview_unavailable">Preview unavailable</string>
+    <string name="navbar_load_failed">Couldn’t load navbar styles. Try again.</string>
+    <string name="navbar_apply_failed">Couldn’t apply this navbar style. Try again.</string>
     <plurals name="theme_count">
         <item quantity="one">%d theme</item>
         <item quantity="other">%d themes</item>

@@ -77,6 +77,7 @@ fun ThemeStoreScreen(
     onThemeClick: (Theme) -> Unit,
     onNavigateToCategory: (String) -> Unit = {},
     onNavigateToInstalledComponents: () -> Unit = {},
+    onNavigateToNavbarStyles: () -> Unit = {},
     bottomPadding: Dp = 0.dp,
     onSearchActiveChange: (Boolean) -> Unit = {},
 ) {
@@ -134,6 +135,7 @@ fun ThemeStoreScreen(
                     onThemeClick = onThemeClick,
                     onNavigateToCategory = onNavigateToCategory,
                     onNavigateToInstalledComponents = onNavigateToInstalledComponents,
+                    onNavigateToNavbarStyles = onNavigateToNavbarStyles,
                     bottomPadding = bottomPadding,
                 )
             }
@@ -151,6 +153,7 @@ private fun BrowseScreen(
     onThemeClick: (Theme) -> Unit,
     onNavigateToCategory: (String) -> Unit,
     onNavigateToInstalledComponents: () -> Unit,
+    onNavigateToNavbarStyles: () -> Unit,
     bottomPadding: Dp,
 ) {
     Column(Modifier.fillMaxSize()) {
@@ -172,132 +175,142 @@ private fun BrowseScreen(
                 Icon(Icons.Default.Layers, stringResource(R.string.installed_components))
             }
         }
-        when {
-            uiState.isLoading && uiState.themes.isEmpty() -> LoadingState()
-            uiState.error != null && uiState.themes.isEmpty() ->
-                ErrorState(uiState.error, onRefresh)
-            uiState.themes.isEmpty() -> EmptyState(false)
-            else -> {
-                val groups = remember(uiState.themes) { uiState.themes.groupBy { it.category } }
-                // Keep featured picks stable while installation state changes and favor varied
-                // categories.
-                val featured =
-                    remember(uiState.themes) {
-                        val candidates =
-                            uiState.themes.filterNot { it.isLocal }.ifEmpty { uiState.themes }
-                        (candidates.distinctBy { it.category } + candidates)
-                            .distinctBy { it.id }
-                            .take(5)
+        val groups = remember(uiState.themes) { uiState.themes.groupBy { it.category } }
+        val featured =
+            remember(uiState.themes) {
+                val candidates = uiState.themes.filterNot { it.isLocal }.ifEmpty { uiState.themes }
+                (candidates.distinctBy { it.category } + candidates).distinctBy { it.id }.take(5)
+            }
+        val categories =
+            remember(uiState.categories, groups) {
+                val known = uiState.categories.filter { groups[it.id]?.isNotEmpty() == true }
+                known +
+                    groups.keys
+                        .filter { key -> known.none { it.id == key } }
+                        .map { key ->
+                            ThemeCategory(
+                                key,
+                                key.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                            )
+                        }
+            }
+        val navbarCategory =
+            ThemeCategory("builtin_navbar", stringResource(R.string.navbar_styles_title))
+        val browseCategories =
+            remember(categories, navbarCategory) {
+                categories.toMutableList().apply {
+                    val iconCategory = indexOfLast { category ->
+                        listOf("wifi", "signal", "icon").any { it in category.id.lowercase() }
                     }
-                val categories =
-                    remember(uiState.categories, groups) {
-                        val known =
-                            uiState.categories.filter { groups[it.id]?.isNotEmpty() == true }
-                        known +
-                            groups.keys
-                                .filter { key -> known.none { it.id == key } }
-                                .map { key ->
-                                    ThemeCategory(
-                                        key,
-                                        key.replace('_', ' ').replaceFirstChar { it.uppercase() },
-                                    )
-                                }
+                    add(iconCategory + 1, navbarCategory)
+                }
+            }
+        val installed =
+            uiState.themes.filter {
+                themeStates[it.id] is ThemeInstallState.Installed ||
+                    themeStates[it.id] is ThemeInstallState.InstalledInactive ||
+                    it.isLocal
+            }
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 28.dp + bottomPadding),
+            verticalArrangement = Arrangement.spacedBy(28.dp),
+        ) {
+            item(key = "intro") { BrowseIntro(onSearchClick) }
+            if (uiState.isLoading) {
+                item(key = "refresh") {
+                    LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 24.dp))
+                }
+            }
+            if (featured.isNotEmpty()) {
+                item(key = "featured") { FeaturedCarousel(featured, themeStates, onThemeClick) }
+            }
+            item(key = "categories") {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    StoreSectionHeading(
+                        stringResource(R.string.browse_categories),
+                        Modifier.padding(horizontal = 24.dp),
+                    )
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(browseCategories, key = { it.id }) { category ->
+                            val navbar = category.id == navbarCategory.id
+                            val count = groups[category.id].orEmpty().size
+                            CategoryTile(
+                                category,
+                                if (navbar) stringResource(R.string.built_in)
+                                else pluralStringResource(R.plurals.theme_count, count, count),
+                            ) {
+                                if (navbar) onNavigateToNavbarStyles()
+                                else onNavigateToCategory(category.id)
+                            }
+                        }
                     }
-                val installed =
-                    uiState.themes.filter {
-                        themeStates[it.id] is ThemeInstallState.Installed ||
-                            themeStates[it.id] is ThemeInstallState.InstalledInactive ||
-                            it.isLocal
+                }
+            }
+            if (uiState.themes.isEmpty()) {
+                item(key = "catalog_state") {
+                    when {
+                        uiState.isLoading -> LoadingState()
+                        uiState.error != null -> ErrorState(uiState.error, onRefresh)
+                        else -> EmptyState(false)
                     }
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 28.dp + bottomPadding),
-                    verticalArrangement = Arrangement.spacedBy(28.dp),
+                }
+            }
+            item(key = "your_setup") {
+                StoreSurface(
+                    onClick = onNavigateToInstalledComponents,
+                    modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ) {
-                    item(key = "intro") { BrowseIntro(onSearchClick) }
-                    if (uiState.isLoading) {
-                        item(key = "refresh") {
-                            LinearWavyProgressIndicator(
-                                Modifier.fillMaxWidth().padding(horizontal = 24.dp)
+                    Row(
+                        Modifier.padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        StoreEmblem(
+                            Icons.Default.Layers,
+                            Modifier.size(56.dp),
+                            MaterialTheme.colorScheme.secondary,
+                            MaterialTheme.colorScheme.onSecondary,
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.your_setup),
+                                style = MaterialTheme.typography.titleLargeEmphasized,
+                            )
+                            Text(
+                                stringResource(R.string.your_setup_description),
+                                style = MaterialTheme.typography.bodyMedium,
                             )
                         }
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                     }
-                    item(key = "featured") { FeaturedCarousel(featured, themeStates, onThemeClick) }
-                    item(key = "categories") {
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            StoreSectionHeading(
-                                stringResource(R.string.browse_categories),
-                                Modifier.padding(horizontal = 24.dp),
-                            )
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 20.dp),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                items(categories, key = { it.id }) { category ->
-                                    CategoryTile(category, groups[category.id].orEmpty().size) {
-                                        onNavigateToCategory(category.id)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    item(key = "your_setup") {
-                        StoreSurface(
-                            onClick = onNavigateToInstalledComponents,
-                            modifier = Modifier.padding(horizontal = 20.dp).fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        ) {
-                            Row(
-                                Modifier.padding(20.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            ) {
-                                StoreEmblem(
-                                    Icons.Default.Layers,
-                                    Modifier.size(56.dp),
-                                    MaterialTheme.colorScheme.secondary,
-                                    MaterialTheme.colorScheme.onSecondary,
-                                )
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        stringResource(R.string.your_setup),
-                                        style = MaterialTheme.typography.titleLargeEmphasized,
-                                    )
-                                    Text(
-                                        stringResource(R.string.your_setup_description),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                }
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowForward,
-                                    contentDescription = null,
-                                )
-                            }
-                        }
-                    }
-                    if (installed.isNotEmpty()) {
-                        item(key = "installed") {
-                            ThemeSection(
-                                stringResource(R.string.your_collection),
-                                installed,
-                                themeStates,
-                                onThemeClick,
-                            )
-                        }
-                    }
-                    categories.forEach { category ->
-                        item(key = "category_${category.id}") {
-                            ThemeSection(
-                                category.name,
-                                groups[category.id].orEmpty(),
-                                themeStates,
-                                onThemeClick,
-                                onViewAll = { onNavigateToCategory(category.id) },
-                            )
-                        }
-                    }
+                }
+            }
+            if (installed.isNotEmpty()) {
+                item(key = "installed") {
+                    ThemeSection(
+                        stringResource(R.string.your_collection),
+                        installed,
+                        themeStates,
+                        onThemeClick,
+                    )
+                }
+            }
+            categories.forEach { category ->
+                item(key = "category_${category.id}") {
+                    ThemeSection(
+                        category.name,
+                        groups[category.id].orEmpty(),
+                        themeStates,
+                        onThemeClick,
+                        onViewAll = { onNavigateToCategory(category.id) },
+                    )
                 }
             }
         }
@@ -377,7 +390,7 @@ private fun BrowseIntro(onSearchClick: () -> Unit) {
 }
 
 @Composable
-private fun CategoryTile(category: ThemeCategory, count: Int, onClick: () -> Unit) {
+private fun CategoryTile(category: ThemeCategory, subtitle: String, onClick: () -> Unit) {
     val (container, foreground) = storeCategoryColors(category.id)
     StoreSurface(onClick, Modifier.width(156.dp), container, foreground) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -390,10 +403,7 @@ private fun CategoryTile(category: ThemeCategory, count: Int, onClick: () -> Uni
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    pluralStringResource(R.plurals.theme_count, count, count),
-                    style = MaterialTheme.typography.labelMedium,
-                )
+                Text(subtitle, style = MaterialTheme.typography.labelMedium)
             }
         }
     }

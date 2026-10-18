@@ -138,6 +138,7 @@ fun storeCategoryIcon(category: String): ImageVector =
     when {
         "charging" in category -> Icons.Default.Bolt
         "battery" in category -> Icons.Default.BatteryFull
+        "navbar" in category -> Icons.Default.SmartButton
         "wifi" in category -> Icons.Default.Wifi
         "signal" in category -> Icons.Default.SignalCellularAlt
         "icon" in category -> Icons.Default.Apps
