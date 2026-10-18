@@ -16,127 +16,176 @@
 
 package com.android.axion.axthemestore.ui
 
-import android.content.Context
 import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import android.net.Uri
+import androidx.compose.animation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.*
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.android.axion.axthemestore.ui.components.CustomizationToolbar
+import com.android.axion.axthemestore.viewmodel.FontViewModel
 import com.android.axion.axthemestore.viewmodel.ThemeStoreViewModel
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun MainScreen(viewModel: ThemeStoreViewModel) {
+fun MainScreen(
+    viewModel: ThemeStoreViewModel,
+    fontViewModel: FontViewModel,
+    fontLaunchRequest: Int = 0,
+) {
     val navController = rememberNavController()
+    val startRoute = rememberSaveable { if (fontLaunchRequest > 0) "fonts" else "themes" }
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
+    val entry by navController.currentBackStackEntryAsState()
+    val route = entry?.destination?.route
+    var searchingThemes by remember { mutableStateOf(false) }
+    val toolbarVisible =
+        (route == "themes" || route == "fonts") &&
+            !(route == "themes" && searchingThemes) &&
+            !WindowInsets.isImeVisible
+    val toolbarPadding = if (toolbarVisible) 96.dp else 20.dp
 
+    fun switchSection(fonts: Boolean) {
+        val destination = if (fonts) "fonts" else "themes"
+        if (navController.currentDestination?.route == destination) return
+        navController.navigate(destination) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    LaunchedEffect(fontLaunchRequest) { if (fontLaunchRequest > 0) switchSection(true) }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.checkInstallStates()
+                fontViewModel.refresh()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    
     DisposableEffect(context) {
-        val packageReceiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                viewModel.loadThemes(forceRefresh = true)
-                viewModel.loadIconPacks()
-            }
-        }
-        
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_PACKAGE_ADDED)
-            addAction(Intent.ACTION_PACKAGE_REMOVED)
-            addAction(Intent.ACTION_PACKAGE_REPLACED)
-            addDataScheme("package")
-        }
-        
-        context.registerReceiver(packageReceiver, filter)
-        onDispose {
-            context.unregisterReceiver(packageReceiver)
-        }
-    }
-    
-    val motionScheme = MaterialTheme.motionScheme
-    NavHost(
-        navController = navController,
-        startDestination = "themes",
-        enterTransition = { fadeIn(motionScheme.defaultEffectsSpec()) },
-        exitTransition = { fadeOut(motionScheme.defaultEffectsSpec()) },
-        popEnterTransition = { fadeIn(motionScheme.defaultEffectsSpec()) },
-        popExitTransition = { fadeOut(motionScheme.defaultEffectsSpec()) }
-    ) {
-        composable("themes") {
-            ThemeStoreScreen(
-                viewModel = viewModel,
-                onThemeClick = { theme ->
-                    navController.navigate("detail/${theme.id}")
-                },
-                onNavigateToCategory = { categoryId ->
-                    navController.navigate("category/$categoryId")
-                },
-                onNavigateToInstalledComponents = {
-                    navController.navigate("installed_components")
+        val receiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    viewModel.loadThemes(forceRefresh = true)
+                    viewModel.loadIconPacks()
+                    fontViewModel.refresh()
                 }
-            )
-        }
-
-        composable("installed_components") {
-            InstalledComponentsScreen(
-                viewModel = viewModel,
-                onBackClick = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = "category/{categoryId}",
-            arguments = listOf(navArgument("categoryId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val categoryId = backStackEntry.arguments?.getString("categoryId")
-            categoryId?.let {
-                CategoryThemesScreen(
-                    categoryId = it,
+            }
+        val filter =
+            IntentFilter().apply {
+                addAction(Intent.ACTION_PACKAGE_ADDED)
+                addAction(Intent.ACTION_PACKAGE_REMOVED)
+                addAction(Intent.ACTION_PACKAGE_REPLACED)
+                addDataScheme("package")
+            }
+        context.registerReceiver(receiver, filter)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    val motion = MaterialTheme.motionScheme
+    Box(Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = startRoute,
+            enterTransition = {
+                fadeIn(motion.defaultEffectsSpec()) +
+                    slideInHorizontally(motion.defaultSpatialSpec()) {
+                        if (targetState.destination.route == "themes") -it / 16 else it / 16
+                    }
+            },
+            exitTransition = { fadeOut(motion.fastEffectsSpec()) },
+            popEnterTransition = { fadeIn(motion.defaultEffectsSpec()) },
+            popExitTransition = {
+                fadeOut(motion.fastEffectsSpec()) +
+                    slideOutHorizontally(motion.fastSpatialSpec()) { it / 16 }
+            },
+        ) {
+            composable("themes") {
+                ThemeStoreScreen(
                     viewModel = viewModel,
-                    onThemeClick = { theme ->
-                        navController.navigate("detail/${theme.id}")
+                    onThemeClick = { navController.navigate("detail/" + Uri.encode(it.id)) },
+                    onNavigateToCategory = { navController.navigate("category/" + Uri.encode(it)) },
+                    onNavigateToInstalledComponents = {
+                        navController.navigate("installed_components")
                     },
-                    onBackClick = { navController.popBackStack() }
+                    bottomPadding = toolbarPadding,
+                    onSearchActiveChange = { searchingThemes = it },
                 )
+            }
+            composable("fonts") {
+                FontCustomizationScreen(fontViewModel, bottomPadding = toolbarPadding)
+            }
+            composable("installed_components") {
+                InstalledComponentsScreen(viewModel, onBackClick = { navController.popBackStack() })
+            }
+            composable(
+                route = "category/{categoryId}",
+                arguments = listOf(navArgument("categoryId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                backStackEntry.arguments?.getString("categoryId")?.let { id ->
+                    CategoryThemesScreen(
+                        categoryId = id,
+                        viewModel = viewModel,
+                        onThemeClick = { navController.navigate("detail/" + Uri.encode(it.id)) },
+                        onBackClick = { navController.popBackStack() },
+                    )
+                }
+            }
+            composable(
+                route = "detail/{themeId}",
+                arguments = listOf(navArgument("themeId") { type = NavType.StringType }),
+            ) { backStackEntry ->
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
+                val id = backStackEntry.arguments?.getString("themeId")
+                state.themes
+                    .find { it.id == id }
+                    ?.let { theme ->
+                        ThemeDetailScreen(
+                            theme,
+                            viewModel,
+                            onBackClick = { navController.popBackStack() },
+                        )
+                    }
             }
         }
-
-        composable(
-            route = "detail/{themeId}",
-            arguments = listOf(navArgument("themeId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val themeId = backStackEntry.arguments?.getString("themeId")
-            val uiState = viewModel.uiState.value
-            val theme = uiState.themes.find { it.id == themeId }
-
-            theme?.let {
-                ThemeDetailScreen(
-                    theme = it,
-                    viewModel = viewModel,
-                    onBackClick = { navController.popBackStack() }
-                )
-            }
+        AnimatedVisibility(
+            visible = toolbarVisible,
+            modifier =
+                Modifier.align(Alignment.BottomCenter)
+                    .windowInsetsPadding(
+                        WindowInsets.navigationBars
+                            .union(WindowInsets.displayCutout)
+                            .only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)
+                    )
+                    .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+            enter =
+                fadeIn(motion.defaultEffectsSpec()) +
+                    slideInVertically(motion.defaultSpatialSpec()) { it / 2 },
+            exit =
+                fadeOut(motion.fastEffectsSpec()) +
+                    slideOutVertically(motion.fastSpatialSpec()) { it / 2 },
+        ) {
+            CustomizationToolbar(fontsSelected = route == "fonts", onSelect = ::switchSection)
         }
     }
 }

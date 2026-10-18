@@ -68,6 +68,7 @@ fun StoreSurface(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.surfaceContainerLow,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -86,6 +87,7 @@ fun StoreSurface(
         )
     Surface(
         onClick = onClick,
+        enabled = enabled,
         modifier =
             modifier.graphicsLayer {
                 scaleX = scale

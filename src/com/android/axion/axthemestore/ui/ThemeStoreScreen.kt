@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.axion.axthemestore.R
@@ -76,11 +77,14 @@ fun ThemeStoreScreen(
     onThemeClick: (Theme) -> Unit,
     onNavigateToCategory: (String) -> Unit = {},
     onNavigateToInstalledComponents: () -> Unit = {},
+    bottomPadding: Dp = 0.dp,
+    onSearchActiveChange: (Boolean) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val themeStates by viewModel.themeStates.collectAsStateWithLifecycle()
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(isSearchActive) { onSearchActiveChange(isSearchActive) }
     val browseState = rememberLazyListState()
     val closeSearch = {
         isSearchActive = false
@@ -130,6 +134,7 @@ fun ThemeStoreScreen(
                     onThemeClick = onThemeClick,
                     onNavigateToCategory = onNavigateToCategory,
                     onNavigateToInstalledComponents = onNavigateToInstalledComponents,
+                    bottomPadding = bottomPadding,
                 )
             }
         }
@@ -146,6 +151,7 @@ private fun BrowseScreen(
     onThemeClick: (Theme) -> Unit,
     onNavigateToCategory: (String) -> Unit,
     onNavigateToInstalledComponents: () -> Unit,
+    bottomPadding: Dp,
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -206,7 +212,7 @@ private fun BrowseScreen(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 28.dp),
+                    contentPadding = PaddingValues(bottom = 28.dp + bottomPadding),
                     verticalArrangement = Arrangement.spacedBy(28.dp),
                 ) {
                     item(key = "intro") { BrowseIntro(onSearchClick) }

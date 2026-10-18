@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2024-2026 Lunaris AOSP
+     SPDX-License-Identifier: Apache-2.0 -->
+<resources>
+    <string name="store_tab_ui">UI</string>
+    <string name="store_tab_fonts">Fonts</string>
+    <string name="store_ui_customization">UI customization</string>
+    <string name="store_font_customization">Font customization</string>
+    <string name="font_headline">Find your type.</string>
+    <string name="font_intro">A fresh look, in every letter.</string>
+    <string name="font_current">Current font</string>
+    <string name="font_default">Default</string>
+    <string name="font_bundled">On device</string>
+    <string name="font_github">GitHub</string>
+    <string name="font_import">Import font</string>
+    <string name="font_import_description">Choose a TTF or OTF file</string>
+    <string name="font_search">Search fonts</string>
+    <string name="font_download_preview">Download to preview</string>
+    <string name="font_saved">Downloaded</string>
+    <string name="font_preview">Preview</string>
+    <string name="font_preview_description">See how this font looks before applying it.</string>
+    <string name="font_apply">Apply font</string>
+    <string name="font_sample_title">The quick brown fox</string>
+    <string name="font_sample_subtitle">Jumps over the lazy dog.</string>
+    <string name="font_sample_body">Little details make a big difference. Pack my box with five dozen liquor jugs.</string>
+    <string name="font_sample_numbers" translatable="false">0123456789</string>
+    <string name="font_sample_symbols" translatable="false">"!@#$%^&amp;*()_+-=[]{}|;\':\",.&lt;&gt;?/"</string>
+    <string name="font_sample_glyphs" translatable="false">Aa</string>
+    <string name="font_try_text">Try your own text</string>
+    <string name="font_loading_preview">Preparing preview</string>
+    <string name="font_applying">Applying font</string>
+    <string name="font_applied">Font applied</string>
+    <string name="font_resetting">Resetting font</string>
+    <string name="font_reset_done">Default font restored</string>
+    <string name="font_restarting">Restarting</string>
+    <string name="font_operation_failed">Could not update the font</string>
+    <string name="font_catalog_failed">Could not load fonts from GitHub</string>
+    <string name="font_offline">Showing saved fonts</string>
+    <string name="font_catalog_empty">No fonts available yet</string>
+    <string name="font_no_results">No matching fonts</string>
+    <string name="font_no_results_hint">Try another name or switch collections.</string>
+    <string name="font_github_description">Fonts from the Lunaris collection. Download one to try it.</string>
+    <string name="font_loading">Loading fonts</string>
+    <string name="font_reset">Reset font</string>
+    <string name="font_reset_title">Restore the default font?</string>
+    <string name="font_reset_description">This removes the active custom font and restores the system font. Your downloaded fonts are kept.</string>
+    <string name="font_reboot">Restart device</string>
+    <string name="font_reboot_title">Restart to finish</string>
+    <string name="font_reboot_description">Restart your device to use the new font or emoji style everywhere.</string>
+    <string name="font_restart_ui">Restart System UI</string>
+    <string name="font_restart_ui_description">Restart System UI to refresh the status bar and other system text with your new font.</string>
+    <string name="font_later">Later</string>
+    <string name="font_emoji">Emoji style</string>
+    <string name="font_emoji_description">A little more expression.</string>
+    <string name="font_emoji_applied">Emoji style updated</string>
+    <string name="font_emoji_sample" translatable="false">😀 🥰 🌈 ✨ 🎉</string>
+    <string name="font_action_failed">Something went wrong</string>
+    <string name="font_close">Close</string>
+    <string-array name="font_emoji_entries">
+        <item>Stock</item>
+        <item>iOS</item>
+        <item>Samsung</item>
+        <item>SwiftUI</item>
+        <item>Facebook</item>
+    </string-array>
+    <plurals name="font_collection_count">
+        <item quantity="one">%d font</item>
+        <item quantity="other">%d fonts</item>
+    </plurals>
+</resources>

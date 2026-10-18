@@ -1,0 +1,237 @@
+/*
+ * Copyright (C) 2025 AxionOS
+ * Copyright (C) 2024-2026 Lunaris AOSP
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package com.android.axion.axthemestore.fonts
+
+import android.content.Context
+import android.content.res.Resources
+import android.graphics.Typeface
+import android.graphics.fonts.FontFamilyUpdateRequest
+import android.graphics.fonts.FontFileUpdateRequest
+import android.graphics.fonts.FontFileUtil
+import android.graphics.fonts.FontManager
+import android.graphics.fonts.FontStyle
+import android.graphics.fonts.FontVariationAxis
+import android.os.ParcelFileDescriptor
+import android.os.ServiceManager
+import android.os.SystemProperties
+import android.os.UserHandle
+import android.provider.Settings
+import com.android.internal.statusbar.IStatusBarService
+import com.android.internal.util.lunaris.ThemeUtils
+import java.io.File
+import java.io.FileInputStream
+import java.nio.channels.FileChannel
+import org.json.JSONObject
+
+class SystemFontController(private val context: Context) {
+    private val resolver = context.contentResolver
+    private val themeUtils = ThemeUtils.getInstance(context)
+    private val manager
+        get() = checkNotNull(context.getSystemService(FontManager::class.java))
+
+    fun selection(): FontSelection =
+        FontSelection(
+            overlayPackage =
+                themeUtils.getOverlayInfos(CATEGORY).firstOrNull { it.isEnabled }?.packageName
+                    ?: "android",
+            customFontName =
+                Settings.Secure.getStringForUser(resolver, CUSTOM_NAME, UserHandle.USER_CURRENT)
+                    .orEmpty(),
+            emojiStyle =
+                SystemProperties.get(
+                    EMOJI_PROPERTY,
+                    Settings.System.getStringForUser(
+                        resolver,
+                        "emoji_style",
+                        UserHandle.USER_CURRENT,
+                    ) ?: "android",
+                ),
+        )
+
+    fun bundledFonts(): List<BundledFont> =
+        themeUtils
+            .getOverlayPackagesForCategory(CATEGORY, "android")
+            .distinct()
+            .filter { it != EXTERNAL_OVERLAY }
+            .mapNotNull { pkg ->
+                runCatching {
+                        val pm = context.packageManager
+                        val name =
+                            if (pkg == "android") ""
+                            else pm.getApplicationInfo(pkg, 0).loadLabel(pm).toString()
+                        val resources =
+                            if (pkg == "android") Resources.getSystem()
+                            else pm.getResourcesForApplication(pkg)
+                        val familyKey =
+                            if (name == "NothingDot57") "config_headlineFontFamily"
+                            else "config_bodyFontFamily"
+                        val id = resources.getIdentifier(familyKey, "string", pkg)
+                        val typeface =
+                            if (id == 0) Typeface.DEFAULT
+                            else Typeface.create(resources.getString(id), Typeface.NORMAL)
+                        BundledFont(pkg, name, typeface)
+                    }
+                    .getOrNull()
+            }
+            .sortedWith(
+                compareBy<BundledFont> { it.packageName != "android" }
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+            )
+
+    fun preview(file: File, name: String): FontPreview {
+        require(file.length() in 1..MAX_FONT_BYTES) { "Invalid font file size" }
+        postScriptName(file)
+        return FontPreview(name, Typeface.createFromFile(file), file = file)
+    }
+
+    fun applyBundled(font: BundledFont) {
+        val property =
+            if (font.packageName == "android") ""
+            else {
+                val res = context.packageManager.getResourcesForApplication(font.packageName)
+                listOf(
+                        "config_bodyFontFamily",
+                        "config_bodyFontFamilyMedium",
+                        "config_headlineFontFamily",
+                        "config_headlineFontFamilyMedium",
+                    )
+                    .joinToString(":") { key ->
+                        val id = res.getIdentifier(key, "string", font.packageName)
+                        if (id != 0) res.getString(id) else font.packageName
+                    }
+            }
+        val previous = selection()
+        themeUtils.setOverlayEnabled(CATEGORY, font.packageName, "android")
+        val selected =
+            themeUtils.getOverlayInfos(CATEGORY).firstOrNull { it.isEnabled }?.packageName
+                ?: "android"
+        check(selected == font.packageName) { "Could not apply the font overlay" }
+        if (previous.customFontName.isNotBlank() || previous.overlayPackage == EXTERNAL_OVERLAY) {
+            manager.clearUpdates()
+        }
+        SystemProperties.set(OVERLAY_PROPERTY, property)
+        putCustomName("")
+    }
+
+    fun install(file: File): String {
+        val name = postScriptName(file)
+        val variable =
+            FileInputStream(file).use { stream ->
+                val buffer =
+                    stream.channel.map(FileChannel.MapMode.READ_ONLY, 0, stream.channel.size())
+                FontFileUtil.getSupportedAxes(buffer, 0).contains(0x77676874)
+            }
+        val fonts = mutableListOf<FontFamilyUpdateRequest.Font>()
+        if (variable) {
+            for (weight in 100..900 step 100) {
+                for (slant in listOf(FontStyle.FONT_SLANT_UPRIGHT, FontStyle.FONT_SLANT_ITALIC)) {
+                    fonts +=
+                        FontFamilyUpdateRequest.Font.Builder(name, FontStyle(weight, slant))
+                            .setAxes(listOf(FontVariationAxis("wght", weight.toFloat())))
+                            .build()
+                }
+            }
+        } else {
+            for (weight in listOf(FontStyle.FONT_WEIGHT_NORMAL, FontStyle.FONT_WEIGHT_BOLD)) {
+                fonts +=
+                    FontFamilyUpdateRequest.Font.Builder(
+                            name,
+                            FontStyle(weight, FontStyle.FONT_SLANT_UPRIGHT),
+                        )
+                        .build()
+            }
+        }
+        val family = FontFamilyUpdateRequest.FontFamily.Builder(EXTERNAL_FAMILY, fonts).build()
+        ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+            val request =
+                FontFamilyUpdateRequest.Builder()
+                    .addFontFileUpdateRequest(FontFileUpdateRequest(descriptor, byteArrayOf()))
+                    .addFontFamily(family)
+                    .build()
+            manager.clearUpdates()
+            val result = manager.updateFontFamily(request, manager.fontConfig.configVersion)
+            check(result == FontManager.RESULT_SUCCESS) { "Font service returned " + result }
+        }
+        SystemProperties.set(OVERLAY_PROPERTY, List(4) { EXTERNAL_FAMILY }.joinToString(":"))
+        val raw =
+            Settings.Secure.getStringForUser(
+                resolver,
+                Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES,
+                UserHandle.USER_CURRENT,
+            )
+        val overlays = if (raw.isNullOrBlank()) JSONObject() else JSONObject(raw)
+        if (overlays.has(CATEGORY)) {
+            overlays.remove(CATEGORY)
+            writeOverlays(overlays)
+        }
+        overlays.put(CATEGORY, EXTERNAL_OVERLAY)
+        writeOverlays(overlays)
+        putCustomName(name)
+        return name
+    }
+
+    fun reset() = applyBundled(BundledFont("android", "", Typeface.DEFAULT))
+
+    fun setEmoji(style: String) {
+        require(style in EMOJI_STYLES)
+        SystemProperties.set(EMOJI_PROPERTY, style)
+        check(
+            Settings.System.putStringForUser(
+                resolver,
+                "emoji_style",
+                style,
+                UserHandle.USER_CURRENT,
+            )
+        )
+    }
+
+    fun restart(kind: FontRestart) {
+        val service =
+            checkNotNull(IStatusBarService.Stub.asInterface(ServiceManager.getService("statusbar")))
+        when (kind) {
+            FontRestart.SYSTEM_UI -> service.restartSystemUI()
+            FontRestart.DEVICE -> service.reboot(false, "system_font_change")
+        }
+    }
+
+    private fun postScriptName(file: File): String =
+        FileInputStream(file).use { stream ->
+            require(stream.channel.size() in 1..MAX_FONT_BYTES) { "Invalid font file size" }
+            val buffer = stream.channel.map(FileChannel.MapMode.READ_ONLY, 0, stream.channel.size())
+            requireNotNull(FontFileUtil.getPostScriptName(buffer, 0)?.takeIf { it.isNotBlank() }) {
+                "This file is not a supported font"
+            }
+        }
+
+    private fun putCustomName(name: String) {
+        check(
+            Settings.Secure.putStringForUser(resolver, CUSTOM_NAME, name, UserHandle.USER_CURRENT)
+        )
+    }
+
+    private fun writeOverlays(overlays: JSONObject) {
+        check(
+            Settings.Secure.putStringForUser(
+                resolver,
+                Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES,
+                overlays.toString(),
+                UserHandle.USER_CURRENT,
+            )
+        )
+    }
+
+    companion object {
+        const val MAX_FONT_BYTES = 50L * 1024 * 1024
+        const val CUSTOM_NAME = "custom_font_name"
+        const val CATEGORY = "android.theme.customization.font"
+        const val OVERLAY_PROPERTY = "persist.sys.ax_overlay_fonts"
+        const val EMOJI_PROPERTY = "persist.sys.ax_emoji_style"
+        const val EXTERNAL_FAMILY = "ext_font"
+        const val EXTERNAL_OVERLAY = "com.android.theme.font.extfont"
+        val EMOJI_STYLES = listOf("android", "ios", "samsung", "swiftui", "facebook")
+    }
+}
