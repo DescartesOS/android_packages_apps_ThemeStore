@@ -8,6 +8,8 @@ package com.android.axion.axthemestore.viewmodel
 import android.app.Application
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.DeadObjectException
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.axion.axthemestore.R
@@ -264,9 +266,14 @@ class FontViewModel(application: Application) : AndroidViewModel(application) {
                     withContext(Dispatchers.IO) { action() }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
-                    _state.update {
-                        it.copy(error = e.message ?: text(R.string.font_operation_failed))
-                    }
+                    Log.e("FontViewModel", "Font operation failed: $label", e)
+                    val serviceFailure =
+                        generateSequence<Throwable>(e) { it.cause }
+                            .any { it is DeadObjectException }
+                    val message =
+                        if (serviceFailure) text(R.string.font_service_failed)
+                        else e.message ?: text(R.string.font_operation_failed)
+                    _state.update { it.copy(error = message) }
                 } finally {
                     _state.update { it.copy(operation = null, progress = null) }
                 }

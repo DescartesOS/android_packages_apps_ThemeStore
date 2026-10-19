@@ -104,20 +104,50 @@ class SystemFontController(private val context: Context) {
                         if (id != 0) res.getString(id) else font.packageName
                     }
             }
-        val previous = selection()
         themeUtils.setOverlayEnabled(CATEGORY, font.packageName, "android")
         val selected =
             themeUtils.getOverlayInfos(CATEGORY).firstOrNull { it.isEnabled }?.packageName
                 ?: "android"
         check(selected == font.packageName) { "Could not apply the font overlay" }
-        if (previous.customFontName.isNotBlank() || previous.overlayPackage == EXTERNAL_OVERLAY) {
-            manager.clearUpdates()
-        }
         SystemProperties.set(OVERLAY_PROPERTY, property)
         putCustomName("")
     }
 
     fun install(file: File): String {
+        val staged = stageFont(file)
+        try {
+            return installStaged(staged)
+        } finally {
+            staged.delete()
+        }
+    }
+
+    private fun stageFont(source: File): File {
+        require(source.length() in 1..MAX_FONT_BYTES) { "Invalid font file size" }
+        val staged = File.createTempFile("font-install-", ".font", context.cacheDir)
+        try {
+            source.inputStream().use { input ->
+                staged.outputStream().use { output ->
+                    val buffer = ByteArray(16 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        total += count
+                        require(total <= MAX_FONT_BYTES) { "Font file is too large" }
+                        output.write(buffer, 0, count)
+                    }
+                    require(total > 0) { "Invalid font file size" }
+                }
+            }
+            return staged
+        } catch (e: Exception) {
+            staged.delete()
+            throw e
+        }
+    }
+
+    private fun installStaged(file: File): String {
         val name = postScriptName(file)
         val variable =
             FileInputStream(file).use { stream ->
@@ -152,7 +182,6 @@ class SystemFontController(private val context: Context) {
                     .addFontFileUpdateRequest(FontFileUpdateRequest(descriptor, byteArrayOf()))
                     .addFontFamily(family)
                     .build()
-            manager.clearUpdates()
             val result = manager.updateFontFamily(request, manager.fontConfig.configVersion)
             check(result == FontManager.RESULT_SUCCESS) { "Font service returned " + result }
         }
@@ -164,10 +193,6 @@ class SystemFontController(private val context: Context) {
                 UserHandle.USER_CURRENT,
             )
         val overlays = if (raw.isNullOrBlank()) JSONObject() else JSONObject(raw)
-        if (overlays.has(CATEGORY)) {
-            overlays.remove(CATEGORY)
-            writeOverlays(overlays)
-        }
         overlays.put(CATEGORY, EXTERNAL_OVERLAY)
         writeOverlays(overlays)
         putCustomName(name)

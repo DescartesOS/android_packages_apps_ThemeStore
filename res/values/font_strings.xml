@@ -34,6 +34,7 @@
     <string name="font_reset_done">Default font restored</string>
     <string name="font_restarting">Restarting</string>
     <string name="font_operation_failed">Could not update the font</string>
+    <string name="font_service_failed">Could not send the font to the system font service. Restart your device and try again.</string>
     <string name="font_catalog_failed">Could not load fonts from GitHub</string>
     <string name="font_offline">Showing saved fonts</string>
     <string name="font_catalog_empty">No fonts available yet</string>
