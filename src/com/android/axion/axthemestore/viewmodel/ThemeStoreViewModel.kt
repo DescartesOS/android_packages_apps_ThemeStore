@@ -78,8 +78,9 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
     }
     
     private fun refreshComponentStates() {
-        _enabledComponents.value = themeEngineProxy.getIconThemeTargets().toSet()
-        _categoryThemes.value = themeEngineProxy.getCategoryThemes()
+        val categoryThemes = themeEngineProxy.getCategoryThemes()
+        _categoryThemes.value = categoryThemes
+        _enabledComponents.value = categoryThemes.keys
     }
 
     fun loadThemes(forceRefresh: Boolean = false) {
@@ -178,23 +179,26 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
     }
     
     private fun updateInstallStates(themes: List<Theme>) {
-        val currentIconTheme = themeEngineProxy.getIconTheme()
+        val categoryThemes = themeEngineProxy.getCategoryThemes()
         val enabledThemes = themeEngineProxy.getEnabledThemes()
 
         val states = themes.associate { theme ->
+            val currentState = _themeStates.value[theme.id]
             val state = when {
+                currentState is ThemeInstallState.Downloading ||
+                        currentState is ThemeInstallState.Downloaded ||
+                        currentState is ThemeInstallState.Installing -> currentState
                 theme.isUnified && theme.overlays.isNotEmpty() -> {
                     val packageName = theme.overlays.first().packageName
                     val isInstalled = repository.isThemeInstalled(packageName)
                     
-                    val categoryThemes = themeEngineProxy.getCategoryThemes()
                     val targets = theme.overlays.first().targets
                     val isAnyComponentActive = targets.any { target ->
                         categoryThemes[target] == packageName
                     }
                     
                     when {
-                        isAnyComponentActive -> ThemeInstallState.Installed(theme.versionCode)
+                        isInstalled && isAnyComponentActive -> ThemeInstallState.Installed(theme.versionCode)
                         isInstalled -> ThemeInstallState.InstalledInactive(
                             repository.getInstalledVersionCode(packageName) ?: theme.versionCode
                         )
@@ -206,7 +210,6 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                         repository.isThemeInstalled(overlay.packageName)
                     }.map { it.componentId }.toSet()
 
-                    val categoryThemes = themeEngineProxy.getCategoryThemes()
                     val isAnyActive = theme.overlays.any { overlay ->
                         enabledThemes[overlay.componentId] == overlay.packageName
                                 || categoryThemes[overlay.componentId] == overlay.packageName
@@ -453,16 +456,11 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
         
     fun disableTheme(theme: Theme) {
         viewModelScope.launch {
-            if (theme.isUnified) {
-                val packageName = theme.overlays.first().packageName
-                themeEngineProxy.clearIconTheme()
+            for (packageName in theme.overlays.map { it.packageName }.distinct()) {
                 themeEngineProxy.clearCategoryThemesForPackage(packageName)
-            } else {
-                for (overlay in theme.overlays) {
-                    themeEngineProxy.clearCategoryTheme(overlay.componentId)
-                }
-                themeEngineProxy.notifyThemeChanged()
             }
+            themeEngineProxy.notifyThemeChanged()
+            clearPendingChanges(theme.id)
 
             refreshComponentStates()
             updateInstallStates(_uiState.value.themes)
@@ -478,7 +476,7 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                 theme.overlays
             }
 
-            for (overlay in overlaysToUninstall) {
+            for (overlay in overlaysToUninstall.distinctBy { it.packageName }) {
                 if (repository.isThemeInstalled(overlay.packageName)) {
                     installer.uninstallTheme(overlay.packageName).collect { result ->
                         if (result is ThemeInstaller.InstallResult.Failure) {
@@ -486,16 +484,12 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
                         }
                     }
                 }
+                if (!repository.isThemeInstalled(overlay.packageName)) {
+                    themeEngineProxy.clearCategoryThemesForPackage(overlay.packageName)
+                }
             }
-            
-            if (theme.isUnified) {
-                val packageName = theme.overlays.first().packageName
-                themeEngineProxy.clearIconTheme()
-                themeEngineProxy.clearCategoryThemesForPackage(packageName)
-            } else {
-                val categories = theme.overlays.map { it.componentId }
-                themeEngineProxy.disableThemeOverlays(categories)
-            }
+
+            clearPendingChanges(theme.id)
             
             refreshComponentStates()
             
@@ -636,7 +630,7 @@ class ThemeStoreViewModel(application: Application) : AndroidViewModel(applicati
     }
         
     fun getEnabledComponents(): List<String> {
-        return themeEngineProxy.getIconThemeTargets()
+        return _enabledComponents.value.toList()
     }
         
     fun applyThemeComponents(theme: Theme, selectedCategories: List<String>) {

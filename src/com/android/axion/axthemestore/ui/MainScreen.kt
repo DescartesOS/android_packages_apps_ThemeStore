@@ -20,7 +20,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.ContentObserver
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -39,6 +43,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.android.axion.axthemestore.engine.ThemeEngineProxy
 import com.android.axion.axthemestore.ui.components.CustomizationToolbar
 import com.android.axion.axthemestore.viewmodel.FontViewModel
 import com.android.axion.axthemestore.viewmodel.NavbarViewModel
@@ -89,6 +94,8 @@ fun MainScreen(
         val receiver =
             object : BroadcastReceiver() {
                 override fun onReceive(ctx: Context?, intent: Intent?) {
+                    viewModel.checkInstallStates()
+                    if (intent?.action == Intent.ACTION_OVERLAY_CHANGED) return
                     viewModel.loadThemes(forceRefresh = true)
                     viewModel.loadIconPacks()
                     fontViewModel.refresh()
@@ -99,10 +106,26 @@ fun MainScreen(
                 addAction(Intent.ACTION_PACKAGE_ADDED)
                 addAction(Intent.ACTION_PACKAGE_REMOVED)
                 addAction(Intent.ACTION_PACKAGE_REPLACED)
+                addAction(Intent.ACTION_PACKAGE_CHANGED)
+                addAction(Intent.ACTION_OVERLAY_CHANGED)
                 addDataScheme("package")
             }
+        val observer =
+            object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) {
+                    viewModel.checkInstallStates()
+                }
+            }
         context.registerReceiver(receiver, filter)
-        onDispose { context.unregisterReceiver(receiver) }
+        context.contentResolver.registerContentObserver(
+            Settings.Secure.getUriFor(ThemeEngineProxy.SETTINGS_THEME_ENGINE_DATA),
+            false,
+            observer,
+        )
+        onDispose {
+            context.unregisterReceiver(receiver)
+            context.contentResolver.unregisterContentObserver(observer)
+        }
     }
     val motion = MaterialTheme.motionScheme
     Box(Modifier.fillMaxSize()) {

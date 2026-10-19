@@ -18,6 +18,7 @@ package com.android.axion.axthemestore.engine
 
 import android.content.Context
 import android.content.om.OverlayManager
+import android.content.pm.PackageManager
 import android.content.res.ThemeEngine
 import android.os.Handler
 import android.os.HandlerThread
@@ -174,7 +175,9 @@ class ThemeEngineProxy(private val context: Context) {
 
     fun getEnabledThemes(): Map<String, String> {
         return getThemeConfig().themes
-            .filter { it.value.enabled && it.value.packageName != null }
+            .filter { (_, theme) ->
+                theme.enabled && theme.packageName?.let(::isThemePackageActive) == true
+            }
             .mapValues { it.value.packageName!! }
     }
 
@@ -258,7 +261,13 @@ class ThemeEngineProxy(private val context: Context) {
 
     fun clearCategoryThemesForPackage(packageName: String): Boolean {
         val config = getThemeConfig()
-        val updated = buildUpdatedCategoryConfig(config, config.categoryThemes.filterValues { it != packageName })
+        val themes = config.themes.mapValues { (_, theme) ->
+            if (theme.packageName == packageName) ThemeCategoryConfig(enabled = false) else theme
+        }
+        val updated = buildUpdatedCategoryConfig(
+            config.copy(themes = themes),
+            config.categoryThemes.filterValues { it != packageName }
+        )
         val saved = saveThemeConfig(updated)
         if (saved) {
             workerHandler.post {
@@ -269,9 +278,35 @@ class ThemeEngineProxy(private val context: Context) {
         return saved
     }
 
-    fun getCategoryTheme(category: String): String? = getThemeConfig().categoryThemes[category]
+    fun getCategoryTheme(category: String): String? = getCategoryThemes()[category]
 
-    fun getCategoryThemes(): Map<String, String> = getThemeConfig().categoryThemes
+    fun getCategoryThemes(): Map<String, String> {
+        val config = getThemeConfig()
+        val activePackages = mutableMapOf<String, Boolean>()
+        return config.categoryThemes.filter { (category, packageName) ->
+            val enabled = category in config.iconThemeTargets || config.themes[category]?.enabled == true
+            enabled && activePackages.getOrPut(packageName) { isThemePackageActive(packageName) }
+        }
+    }
+
+    private fun isThemePackageActive(packageName: String): Boolean {
+        return try {
+            val packageInfo = context.packageManager.getPackageInfo(packageName, 0)
+            if (packageInfo.applicationInfo?.enabled != true) {
+                false
+            } else if (packageInfo.isOverlayPackage()) {
+                context.getSystemService(OverlayManager::class.java)
+                    ?.getOverlayInfo(packageName, UserHandle.SYSTEM)?.isEnabled == true
+            } else {
+                true
+            }
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to check active theme package: $packageName", e)
+            false
+        }
+    }
 
     private fun buildUpdatedCategoryConfig(config: ThemeEngineConfig, newCategoryThemes: Map<String, String>): ThemeEngineConfig {
         val uniquePackages = newCategoryThemes.values.toSet()
