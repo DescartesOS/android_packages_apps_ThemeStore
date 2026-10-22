@@ -105,7 +105,7 @@ fun InstalledComponentsScreen(viewModel: ThemeStoreViewModel, onBackClick: () ->
                 item(key = "empty") {
                     Surface(
                         shape = MaterialTheme.shapes.large,
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surfaceBright,
                     ) {
                         Column(
                             Modifier.fillMaxWidth().padding(24.dp),
@@ -137,7 +137,7 @@ fun InstalledComponentsScreen(viewModel: ThemeStoreViewModel, onBackClick: () ->
                 itemsIndexed(components, key = { _, entry -> entry.key }) { index, entry ->
                     Surface(
                         shape = storeGroupedShape(index, components.size),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surfaceBright,
                     ) {
                         Row(
                             Modifier.fillMaxWidth().padding(20.dp),

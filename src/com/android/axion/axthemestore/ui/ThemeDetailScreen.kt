@@ -123,7 +123,7 @@ fun ThemeDetailScreen(theme: Theme, viewModel: ThemeStoreViewModel, onBackClick:
             ) {
                 Surface(
                     shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.surfaceBright,
                 ) {
                     Column(
                         Modifier.fillMaxWidth().padding(20.dp),
@@ -257,7 +257,7 @@ private fun InfoChip(label: String, value: String, modifier: Modifier = Modifier
 
 @Composable
 private fun ComponentOverlayItem(overlay: ThemeOverlay, shape: Shape) {
-    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceBright) {
         Row(
             Modifier.fillMaxWidth().padding(20.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -295,7 +295,7 @@ private fun ComponentSelectionItem(
     val background by
         animateColorAsState(
             if (isEnabled) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerLow,
+            else MaterialTheme.colorScheme.surfaceBright,
             MaterialTheme.motionScheme.defaultEffectsSpec(),
             label = "component selection",
         )

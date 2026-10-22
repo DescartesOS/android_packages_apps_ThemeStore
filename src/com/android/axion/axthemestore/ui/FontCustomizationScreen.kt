@@ -541,7 +541,7 @@ private fun FontActionRow(
         onClick = onClick,
         enabled = enabled,
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.surfaceBright,
     ) {
         Row(
             Modifier.fillMaxWidth().padding(16.dp),

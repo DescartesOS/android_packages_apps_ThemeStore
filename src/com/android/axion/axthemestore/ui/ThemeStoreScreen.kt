@@ -737,7 +737,7 @@ private fun SearchScreen(
                     Surface(
                         onClick = { onSearchChange(query) },
                         shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surfaceBright,
                     ) {
                         Row(
                             Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),

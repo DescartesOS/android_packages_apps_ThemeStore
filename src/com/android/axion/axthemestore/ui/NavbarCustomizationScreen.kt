@@ -202,7 +202,7 @@ private fun NavbarStyleCard(
     val motion = MaterialTheme.motionScheme
     val container by
         animateColorAsState(
-            if (active) colors.primaryContainer else colors.surfaceContainerLow,
+            if (active) colors.primaryContainer else colors.surfaceBright,
             motion.defaultEffectsSpec(),
             label = "navbar selection color",
         )

@@ -66,7 +66,7 @@ fun StoreEmblem(
 fun StoreSurface(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.surfaceContainerLow,
+    color: Color = MaterialTheme.colorScheme.surfaceBright,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
